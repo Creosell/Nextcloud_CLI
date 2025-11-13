@@ -1,3 +1,6 @@
 /.env
 /test_data/
 /logs/
+/Nextcloud_CLI.exe
+/Nextcloud_CLI.spec
+/build/

@@ -1,0 +1,6 @@
+loguru
+nc_py_api
+python-dotenv
+requests
+urllib3
+cx_Freeze
