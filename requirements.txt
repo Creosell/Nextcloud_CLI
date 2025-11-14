@@ -1,6 +1,6 @@
 loguru
-nc_py_api
 python-dotenv
+nc_py_api
 requests
 urllib3
-cx_Freeze
+pyinstaller
