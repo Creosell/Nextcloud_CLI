@@ -17,12 +17,13 @@ LOG_FOLDER = Path("logs")
 os.makedirs(LOG_FOLDER, exist_ok=True)
 LOG_FILE = LOG_FOLDER / "nextcloud_cli_log.txt"
 
+CURRENT_VERSION_OF_PROGRAM = "1.0.0"
+
 # Add a handler for the console output (INFO level)
 logger.add(
     sys.stderr,
     level="INFO",
-    format="{time:HH:mm:ss} | <level>{level: <8}</level> | {message}",
-    colorize=True,
+    format="<green>{time:HH:mm:ss}</green> | <level>{level: <8}</level> | <level>{message}</level>"
 )
 
 # Add a handler for the file output (DEBUG level for full detail)
@@ -34,7 +35,6 @@ logger.add(
     enqueue=True,
     format="{time:YYYY-MM-DD HH:mm:ss.SSS} | {level: <8} | {name}:{function}:{line} - {message}",
 )
-logger.info("Application started. Full log is available in {}", LOG_FILE)
 
 # --- Constants and Configuration ---
 
@@ -76,19 +76,32 @@ def get_nc_client() -> Nextcloud:
 
 def ensure_parent_exists(nc: Nextcloud, remote_path: str) -> bool:
     """Create parent directories for the remote path if they do not exist."""
-    path_obj = Path(remote_path.lstrip("/")).parent
-    if not path_obj.parts:
-        return True
+
+    # 1. Сбрасываем Pathlib для удаленных путей
+    remote_path = remote_path.replace("\\", "/")  # Убедимся, что все слеши прямые
+
+    # 2. Получаем части пути (SCT, Results, DeviceName, Date)
+    path_parts = remote_path.lstrip("/").split('/')
+
+    # Исключаем последнюю часть (имя файла)
+    dir_parts = path_parts[:-1]
 
     current_path = ""
-    for part in path_obj.parts:
-        current_path = str(Path(current_path) / part)
+    # Итерируем по частям пути, которые нужно создать
+    for part in dir_parts:
+        # Строим путь: SCT, затем SCT/Results, затем SCT/Results/DeviceName, и т.д.
+        current_path = (current_path + "/" + part).lstrip('/')
+
         try:
+            # Пытаемся создать каталог
             nc.files.mkdir(current_path)
             logger.debug("Created remote directory: {}", current_path)
         except NextcloudException as e:
-            if "already exists" in str(e) or "405" in str(e) or "409" in str(e):
+            # Если каталог уже существует или есть 405 (и это не ошибка создания)
+            if "already exists" in str(e) or "409" in str(e) or "405" in str(e):
                 logger.debug("Remote directory already exists: {}", current_path)
+                # Продолжаем, поскольку цель — убедиться, что путь существует
+                continue
             else:
                 logger.warning("Failed to create directory: {}, error: {}", current_path, e)
                 return False
@@ -102,7 +115,6 @@ def upload_file(nc: Nextcloud, local_path: str, remote_path: str) -> bool:
     """Uploads a single local file to a remote path in Nextcloud using direct content upload."""
     # Path Normalization: replace backslashes with forward slashes
     remote_path = remote_path.replace("\\", "/")
-
     remote_path = remote_path.lstrip("/")
 
     if not ensure_parent_exists(nc, remote_path):
@@ -135,7 +147,6 @@ def download_file(nc: Nextcloud, remote_path: str, local_path: str, force_overwr
     """Downloads a single remote file to a local path using direct content download."""
     # Path Normalization: replace backslashes with forward slashes
     remote_path = remote_path.replace("\\", "/")
-
     remote_path = remote_path.lstrip("/")
     local_path_obj = Path(local_path)
 
@@ -202,6 +213,8 @@ def main():
 
     args = parser.parse_args()
 
+    logger.info(f"Nextcloud CLI {CURRENT_VERSION_OF_PROGRAM}")
+
     try:
         nc_client = get_nc_client()
     except ValueError:
@@ -212,6 +225,7 @@ def main():
         sys.exit(1)
 
     success = False
+
 
     if args.action == "upload":
         logger.info("Starting UPLOAD operation.")
