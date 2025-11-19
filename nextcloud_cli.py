@@ -1,6 +1,7 @@
 import os
 import sys
 import argparse
+import time
 from pathlib import Path
 
 # External libs
@@ -9,6 +10,14 @@ from dotenv import load_dotenv
 from nc_py_api import Nextcloud, NextcloudException
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
+
+# Constants for Directory Creation Retry
+MAX_DIR_CREATE_RETRIES = 3
+DIR_CREATE_RETRY_DELAY_SEC = 1.0 # 1 second delay
+
+# Constants for Network Operation Retry
+MAX_NETWORK_RETRIES = 2  # Max attempts for file transfer itself
+NETWORK_RETRY_DELAY_SEC = 2.0  # 2 seconds delay
 
 # --- Logging Setup ---
 logger.remove()
@@ -77,108 +86,178 @@ def get_nc_client() -> Nextcloud:
 def ensure_parent_exists(nc: Nextcloud, remote_path: str) -> bool:
     """Create parent directories for the remote path if they do not exist."""
 
-    # 1. Сбрасываем Pathlib для удаленных путей
-    remote_path = remote_path.replace("\\", "/")  # Убедимся, что все слеши прямые
-
-    # 2. Получаем части пути (SCT, Results, DeviceName, Date)
+    remote_path = remote_path.replace("\\", "/")
     path_parts = remote_path.lstrip("/").split('/')
-
-    # Исключаем последнюю часть (имя файла)
     dir_parts = path_parts[:-1]
 
     current_path = ""
-    # Итерируем по частям пути, которые нужно создать
     for part in dir_parts:
-        # Строим путь: SCT, затем SCT/Results, затем SCT/Results/DeviceName, и т.д.
         current_path = (current_path + "/" + part).lstrip('/')
 
-        try:
-            # Пытаемся создать каталог
-            nc.files.mkdir(current_path)
-            logger.debug("Created remote directory: {}", current_path)
-        except NextcloudException as e:
-            # Если каталог уже существует или есть 405 (и это не ошибка создания)
-            if "already exists" in str(e) or "409" in str(e) or "405" in str(e):
-                logger.debug("Remote directory already exists: {}", current_path)
-                # Продолжаем, поскольку цель — убедиться, что путь существует
-                continue
-            else:
-                logger.warning("Failed to create directory: {}, error: {}", current_path, e)
+        # --- RETRY LOGIC FOR MKCOL (Directory Creation) ---
+        for attempt in range(MAX_DIR_CREATE_RETRIES):
+            try:
+                nc.files.mkdir(current_path)
+                logger.debug("Created remote directory: {}", current_path)
+                break  # Success: break out of the retry loop
+
+            except NextcloudException as e:
+                error_str = str(e)
+
+                # Success/Ignorable Errors: Directory already exists (409 Conflict) or 405 Method Not Allowed
+                if "already exists" in error_str or "409" in error_str or "405" in error_str:
+                    logger.debug("Remote directory already exists/uncreatable (Code 405/409): {}", current_path)
+                    break  # Success: The directory exists, move on
+
+                # Failure due to locking/race condition (423 Locked)
+                elif "423" in error_str:
+                    if attempt < MAX_DIR_CREATE_RETRIES - 1:
+                        logger.warning("Directory locked (423). Retrying in {}s for: {}", DIR_CREATE_RETRY_DELAY_SEC,
+                                       current_path)
+                        time.sleep(DIR_CREATE_RETRY_DELAY_SEC)
+                        continue  # Go to next attempt
+                    else:
+                        logger.error("Failed to create directory after {} attempts: {}, error: {}",
+                                     MAX_DIR_CREATE_RETRIES, current_path, e)
+                        return False  # Max retries reached
+
+                # Critical Failures
+                else:
+                    logger.warning("Failed to create directory: {}, unexpected error: {}", current_path, e)
+                    return False
+
+            except Exception as e:
+                # Handle connection errors or other exceptions
+                logger.warning("Failed to create directory: {}, unexpected error: {}", current_path, e)
                 return False
-        except Exception as e:
-            logger.warning("Failed to create directory: {}, unexpected error: {}", current_path, e)
-            return False
+
     return True
 
 
 def upload_file(nc: Nextcloud, local_path: str, remote_path: str) -> bool:
     """Uploads a single local file to a remote path in Nextcloud using direct content upload."""
-    # Path Normalization: replace backslashes with forward slashes
-    remote_path = remote_path.replace("\\", "/")
-    remote_path = remote_path.lstrip("/")
+    remote_path = remote_path.replace("\\", "/").lstrip("/")
 
     if not ensure_parent_exists(nc, remote_path):
         logger.error("Failed to ensure parent directories exist for: {}", remote_path)
         return False
 
     try:
-        # Read file content as raw bytes
         with open(local_path, "rb") as f:
             file_content = f.read()
-
-        # Use the simplified API
-        nc.files.upload(remote_path, file_content)
-
-        logger.info("Upload successful: '{}' -> '{}'".format(local_path, remote_path))
-        return True
 
     except FileNotFoundError:
         logger.error("Local file not found: {}", local_path)
         return False
-    except NextcloudException as e:
-        logger.error("Nextcloud upload failed for '{}': {}", remote_path, e)
-        return False
     except Exception as e:
-        logger.error("Unexpected upload error for '{}': {}".format(local_path, e))
+        logger.error("Unexpected error reading local file '{}': {}", local_path, e)
         return False
+
+    # --- RETRY LOGIC FOR UPLOAD ---
+    for attempt in range(MAX_NETWORK_RETRIES + 1):
+        try:
+            nc.files.upload(remote_path, file_content)
+            logger.info("Upload successful: '{}' -> '{}'".format(local_path, remote_path))
+            return True
+
+        except NextcloudException as e:
+            error_str = str(e)
+
+            # Check for temporary network/server errors (e.g., 5xx status codes)
+            if any(status in error_str for status in ["500", "502", "503", "504"]):
+                if attempt < MAX_NETWORK_RETRIES:
+                    logger.warning(
+                        "Upload failed due to temporary server error. Retrying in {}s (Attempt {}/{}) for: {}",
+                        NETWORK_RETRY_DELAY_SEC, attempt + 1, MAX_NETWORK_RETRIES + 1, remote_path
+                    )
+                    time.sleep(NETWORK_RETRY_DELAY_SEC)
+                    continue  # Retry loop continues
+                else:
+                    logger.error("Upload failed permanently after {} attempts for '{}': {}", MAX_NETWORK_RETRIES + 1,
+                                 remote_path, e)
+                    return False
+            else:
+                # Permanent failure (e.g., 401 Unauthorized, 403 Forbidden)
+                logger.error("Nextcloud upload failed for '{}': {}", remote_path, e)
+                return False
+
+        except Exception as e:
+            # Catch other unexpected network/request exceptions
+            if attempt < MAX_NETWORK_RETRIES:
+                logger.warning("Network error during upload. Retrying in {}s (Attempt {}/{}): {}",
+                               NETWORK_RETRY_DELAY_SEC, attempt + 1, MAX_NETWORK_RETRIES + 1, e)
+                time.sleep(NETWORK_RETRY_DELAY_SEC)
+                continue
+            else:
+                logger.error("Unexpected upload error for '{}': {}".format(local_path, e))
+                return False
+
+    return False  # Should be unreachable if logic is sound
 
 
 def download_file(nc: Nextcloud, remote_path: str, local_path: str, force_overwrite: bool) -> bool:
     """Downloads a single remote file to a local path using direct content download."""
-    # Path Normalization: replace backslashes with forward slashes
-    remote_path = remote_path.replace("\\", "/")
-    remote_path = remote_path.lstrip("/")
+    remote_path = remote_path.replace("\\", "/").lstrip("/")
     local_path_obj = Path(local_path)
 
     if local_path_obj.exists() and not force_overwrite:
         logger.error("Local file exists and --force not specified: {}", local_path)
         return False
 
-    try:
-        # 1. Ensure local parent directories exist
-        local_path_obj.parent.mkdir(parents=True, exist_ok=True)
+    # --- RETRY LOGIC FOR DOWNLOAD ---
+    for attempt in range(MAX_NETWORK_RETRIES + 1):
+        try:
+            # 1. Ensure local parent directories exist
+            local_path_obj.parent.mkdir(parents=True, exist_ok=True)
 
-        # 2. Use nc.files.download to get content as bytes (most reliable method)
-        file_content_bytes = nc.files.download(remote_path)
+            # 2. Use nc.files.download to get content as bytes
+            file_content_bytes = nc.files.download(remote_path)
 
-        # 3. Write the bytes directly to the local file
-        with local_path_obj.open("wb") as f:
-            f.write(file_content_bytes)
+            # 3. Write the bytes directly to the local file
+            with local_path_obj.open("wb") as f:
+                f.write(file_content_bytes)
 
-        logger.info(
-            "Download successful: '{}' -> '{}'. Local file saved as raw bytes. Please use a UTF-8 aware editor.".format(
-                remote_path, local_path))
-        return True
+            logger.info(
+                "Download successful: '{}' -> '{}'. Local file saved as raw bytes. Please use a UTF-8 aware editor.".format(
+                    remote_path, local_path))
+            return True  # Success: Exit the function
 
-    except NextcloudException as e:
-        if "404" in str(e):
-            logger.error("Remote file not found in Nextcloud: {}", remote_path)
-        else:
-            logger.error("Nextcloud download failed for '{}': {}", remote_path, e)
-        return False
-    except Exception as e:
-        logger.error("Unexpected download error for '{}': {}".format(remote_path, e))
-        return False
+        except NextcloudException as e:
+            error_str = str(e)
+
+            # 404 Not Found is a permanent, non-retriable error
+            if "404" in error_str:
+                logger.error("Remote file not found in Nextcloud: {}", remote_path)
+                return False
+
+            # Temporary network/server errors (e.g., 5xx status codes)
+            if any(status in error_str for status in ["500", "502", "503", "504"]):
+                if attempt < MAX_NETWORK_RETRIES:
+                    logger.warning("Download failed due to temporary server error. Retrying in {}s (Attempt {}/{}).",
+                                   NETWORK_RETRY_DELAY_SEC, attempt + 1, MAX_NETWORK_RETRIES + 1)
+                    time.sleep(NETWORK_RETRY_DELAY_SEC)
+                    continue  # Retry loop continues
+                else:
+                    logger.error("Download failed permanently after {} attempts for '{}': {}", MAX_NETWORK_RETRIES + 1,
+                                 remote_path, e)
+                    return False
+            else:
+                # Other permanent failures (e.g., 401, 403)
+                logger.error("Nextcloud download failed for '{}': {}", remote_path, e)
+                return False
+
+        except Exception as e:
+            # Catch other unexpected errors (e.g., network timeout)
+            if attempt < MAX_NETWORK_RETRIES:
+                logger.warning("Network error during download. Retrying in {}s (Attempt {}/{}): {}",
+                               NETWORK_RETRY_DELAY_SEC, attempt + 1, MAX_NETWORK_RETRIES + 1, e)
+                time.sleep(NETWORK_RETRY_DELAY_SEC)
+                continue
+            else:
+                logger.error("Unexpected download error for '{}': {}".format(remote_path, e))
+                return False
+
+    return False  # Should be unreachable
 
 
 # --- Main Application Logic ---

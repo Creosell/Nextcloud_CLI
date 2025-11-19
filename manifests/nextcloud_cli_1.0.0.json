@@ -6,11 +6,11 @@
   "files": [
     {
       "path": "Nextcloud_CLI.exe",
-      "hash": "d9d05e72e122143cf3e9d63ebda4bff7f790e9a42f5a5a730d506ca06e6e7422"
+      "hash": "dfb25e953901812dde4760026988a4da8ddd46978dd087363edda2a00423818f"
     },
     {
       "path": "lib_nextcloud_cli/base_library.zip",
-      "hash": "240ef7df295fb6dee0bb711f9bf5f07b97631f89666066f764bf1c8385028127"
+      "hash": "1748849e1586d7db33af4ff7e1907e8e9717ab416211309b65d14124f66e8ce2"
     },
     {
       "path": "lib_nextcloud_cli/libcrypto-3.dll",
