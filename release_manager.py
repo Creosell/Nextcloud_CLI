@@ -1,3 +1,14 @@
+# /// script
+# requires-python = ">=3.11"
+# dependencies = [
+#     "loguru",
+#     "nc-py-api",
+#     "requests",
+#     "urllib3",
+#     "pyinstaller",
+# ]
+# ///
+
 import os
 import sys
 import json
@@ -7,14 +18,10 @@ import subprocess
 import zipfile
 import concurrent.futures
 from pathlib import Path
-
-try:
-    from loguru import logger
-    from nc_py_api import Nextcloud, NextcloudException
-    from requests.adapters import HTTPAdapter
-    from urllib3.util.retry import Retry
-except ImportError:
-    sys.exit("Missing libs. Run: pip install loguru nc-py-api requests urllib3")
+from loguru import logger
+from nc_py_api import Nextcloud, NextcloudException
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 # --- CONFIGURATION ---
 NC_URL = "https://next-qa.sdsz.dev"
@@ -25,7 +32,6 @@ MAX_WORKERS = 20
 # --- LOGGING ---
 logger.remove()
 logger.add(sys.stderr, format="<green>{time:HH:mm:ss}</green> | {message}", level="INFO")
-logger.add("release.log", rotation="5 MB", level="DEBUG")
 
 # --- GLOBAL CACHE ---
 _DIR_CACHE = set()
@@ -102,30 +108,67 @@ def upload_chunked(nc: Nextcloud, local: Path, remote: str) -> bool:
         return False
 
 
-def prepare_package(mode, path, prod_id, ver, temp_dir):
+def prepare_package(mode, path, include_path, prod_id, ver, temp_dir):
     base_url = f"versions/{prod_id}/{ver}"
     files_map = []
     manifest = {"product_id": prod_id, "version": ver, "base_url": base_url, "package_mode": mode, "files": []}
 
+    # Sources config: List of tuples (SourcePath, KeepFolderName?)
+    # 1. Main path -> False (dump contents to root)
+    sources = [(path, False)]
+
+    # 2. Include path -> True (keep the folder name, e.g. 'config/file.txt')
+    if include_path:
+        if include_path.exists():
+            sources.append((include_path, True))
+            logger.info(f"Including directory as subfolder: {include_path.name}")
+        else:
+            logger.warning(f"Include path ignored (not found): {include_path}")
+
     if mode == "zip":
         zip_name = f"{prod_id}_{ver}.zip"
         zip_file = temp_dir / zip_name
-        logger.info(f"Zipping {path} -> {zip_name}")
+        logger.info(f"Zipping content to -> {zip_name}")
 
         with zipfile.ZipFile(zip_file, 'w', zipfile.ZIP_DEFLATED) as zf:
-            for f in path.rglob('*'):
-                if f.is_file() and f != zip_file:
-                    zf.write(f, f.relative_to(path))
+            for src_path, keep_folder_name in sources:
+                for f in src_path.rglob('*'):
+                    if f.is_file() and f != zip_file:
+                        # Calculate relative path inside archive
+                        rel = f.relative_to(src_path)
+
+                        if keep_folder_name:
+                            # Prepend folder name: config/settings.json
+                            arcname = Path(src_path.name) / rel
+                        else:
+                            # Keep at root: settings.json
+                            arcname = rel
+
+                        zf.write(f, arcname)
 
         manifest["files"].append({"path": zip_name, "hash": get_sha256(zip_file)})
         files_map.append((zip_file, zip_name))
     else:
-        logger.info(f"Scanning {path}...")
-        for f in path.rglob('*'):
-            if f.is_file():
-                rel = f.relative_to(path).as_posix()
-                manifest["files"].append({"path": rel, "hash": get_sha256(f)})
-                files_map.append((f, rel))
+        # Files mode logic
+        logger.info("Scanning files...")
+        for src_path, keep_folder_name in sources:
+            for f in src_path.rglob('*'):
+                if f.is_file():
+                    rel = f.relative_to(src_path)
+
+                    # Determine final remote path structure
+                    if keep_folder_name:
+                        final_rel_path = (Path(src_path.name) / rel).as_posix()
+                    else:
+                        final_rel_path = rel.as_posix()
+
+                    # Check duplicates
+                    if any(d['path'] == final_rel_path for d in manifest['files']):
+                        logger.warning(f"Duplicate file path detected and skipped: {final_rel_path}")
+                        continue
+
+                    manifest["files"].append({"path": final_rel_path, "hash": get_sha256(f)})
+                    files_map.append((f, final_rel_path))
 
     man_path = temp_dir / f"{prod_id}_{ver}.json"
     with open(man_path, 'w', encoding='utf-8') as f:
@@ -139,20 +182,21 @@ def prepare_package(mode, path, prod_id, ver, temp_dir):
 def main():
     parser = argparse.ArgumentParser(description="Release Manager")
     parser.add_argument("mode", choices=["zip", "files"])
-    parser.add_argument("path", type=Path)
+    parser.add_argument("path", type=Path, help="Main build directory (contents go to root)")
     parser.add_argument("product_id")
     parser.add_argument("version")
+    parser.add_argument("--include", type=Path, help="Additional folder (preserved as subfolder)")
     parser.add_argument("--build", action="store_true")
     parser.add_argument("--upload", action="store_true")
     args = parser.parse_args()
 
     if not args.path.exists():
-        sys.exit(f"Path not found: {args.path}")
+        sys.exit(f"Main path not found: {args.path}")
 
     # 1. BUILD (Optional)
     if args.build:
         spec = f"{args.path.name}.spec"
-        # Fixed: using --noconfirm instead of -y
+        # sys.executable now points to the uv-managed python, so this works perfectly
         cmd = [sys.executable, "-m", "PyInstaller", "--distpath", str(args.path.parent),
                "--workpath", str(args.path.parent.parent / "build"), "--clean", "--noconfirm", spec]
         if not run_cmd(cmd): sys.exit(1)
@@ -160,9 +204,16 @@ def main():
     # 2. PACKAGE
     temp_dir = Path("release_artifacts")
     temp_dir.mkdir(exist_ok=True)
-    manifest, upload_list = prepare_package(args.mode, args.path, args.product_id, args.version, temp_dir)
 
-    logger.info(f"Manifest: {manifest.name} | Files: {len(upload_list)}")
+    try:
+        manifest, upload_list = prepare_package(
+            args.mode, args.path, args.include, args.product_id, args.version, temp_dir
+        )
+    except Exception as e:
+        logger.critical(f"Packaging failed: {e}")
+        sys.exit(1)
+
+    logger.info(f"Manifest: {manifest.name} | Files to upload: {len(upload_list)}")
 
     if not args.upload and input("Upload? (y/n): ").lower() != 'y':
         sys.exit(0)
@@ -186,7 +237,6 @@ def main():
             if not upload_chunked(nc, local, f"{remote_root}/{remote}"): failures.append(local)
         else:
             with concurrent.futures.ThreadPoolExecutor(MAX_WORKERS) as pool:
-                # Fixed: Syntax error in f-string and dictionary comprehension
                 futures = {pool.submit(upload_chunked, nc, loc, f"{remote_root}/{rem}"): loc for loc, rem in
                            upload_list}
                 for fut in concurrent.futures.as_completed(futures):

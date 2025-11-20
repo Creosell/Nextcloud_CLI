@@ -29,17 +29,13 @@ LOG_FILE = LOG_FOLDER / "nextcloud_cli_log.txt"
 CURRENT_VERSION_OF_PROGRAM = "1.0.0"
 
 # Add a handler for the console output (INFO level)
-logger.add(
-    sys.stderr,
-    level="INFO",
-    format="<green>{time:HH:mm:ss}</green> | <level>{level: <8}</level> | <level>{message}</level>"
-)
+logger.add(sys.stderr, format="<green>{time:HH:mm:ss}</green> | {message}", level="INFO")
 
 # Add a handler for the file output (DEBUG level for full detail)
 logger.add(
     LOG_FILE,
     level="DEBUG",
-    rotation="10 MB",
+    rotation="5 MB",
     compression="zip",
     enqueue=True,
     format="{time:YYYY-MM-DD HH:mm:ss.SSS} | {level: <8} | {name}:{function}:{line} - {message}",
@@ -60,9 +56,9 @@ def get_nc_client() -> Nextcloud:
     """Initializes and returns the Nextcloud client from .env credentials."""
     load_dotenv()
 
-    url = os.environ.get("NC_SERVER_URL")
-    user = os.environ.get("NC_USER")
-    password = os.environ.get("NC_PASSWORD")
+    url = os.environ.get("NC_SERVER_URL_QC")
+    user = os.environ.get("NC_USER_QC")
+    password = os.environ.get("NC_PASSWORD_QC")
 
     if not all([url, user, password]):
         logger.error("Missing Nextcloud credentials in environment or .env file.")
