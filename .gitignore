@@ -6,3 +6,4 @@
 /build/
 /release.log
 /release_artifacts/
+/release_manager.py
