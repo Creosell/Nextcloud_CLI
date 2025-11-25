@@ -26,7 +26,7 @@ LOG_FOLDER = Path("logs")
 os.makedirs(LOG_FOLDER, exist_ok=True)
 LOG_FILE = LOG_FOLDER / "nextcloud_cli_log.txt"
 
-CURRENT_VERSION_OF_PROGRAM = "1.0.0"
+APP_VERSION = "1.0.0"
 
 # Add a handler for the console output (INFO level)
 logger.add(sys.stderr, format="<green>{time:HH:mm:ss}</green> | {message}", level="INFO")
@@ -288,7 +288,7 @@ def main():
 
     args = parser.parse_args()
 
-    logger.info(f"Nextcloud CLI {CURRENT_VERSION_OF_PROGRAM}")
+    logger.info(f"Nextcloud CLI {APP_VERSION}")
 
     try:
         nc_client = get_nc_client()
