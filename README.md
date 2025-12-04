@@ -85,3 +85,50 @@ To significantly reduce the size of the generated `.exe` file (and consequently 
    * **Path:** `.venv\Scripts\` (Windows)
 
 PyInstaller automatically detects UPX in this folder and will use it to compress the binary during the `--build` process.
+
+# Nextcloud CLI Utility
+
+The `nextcloud_cli.py` script provides a command-line interface for interacting with Nextcloud, supporting parallel transfers and recursive operations.
+
+**Syntax:**
+
+```bash
+  uv run --active nextcloud_cli.py [action] [flags]
+````
+
+**Actions:**
+
+  * `upload`: Uploads a single local file to Nextcloud.
+  * `download`: Downloads a single remote file.
+  * `list`: Recursively lists all files in a remote directory.
+  * `download-dir`: Downloads a remote directory recursively with parallel processing.
+
+**Flags:**
+
+  * `-l`, `--local-path`: Path to local file or directory (Required for transfers).
+  * `-r`, `--remote-path`: Target path on Nextcloud.
+  * `-f`, `--force`: Overwrite existing local files without warning.
+  * `-j`, `--jobs`: Number of parallel threads for directory downloads (Default: 5).
+
+### Examples
+
+**1. Recursive List**
+Lists all files in a remote folder and its subfolders to stdout.
+
+```bash
+  uv run --active nextcloud_cli.py list -r /Project/Builds
+```
+
+**2. Parallel Directory Download**
+Downloads a remote folder recursively using 10 parallel threads to speed up the process.
+
+```bash
+  uv run --active nextcloud_cli.py download-dir -r /Project/Builds -l ./local_builds -j 10 --force
+```
+
+**3. Single File Upload**
+Uploads a specific file to the server.
+
+```bash
+  uv run --active nextcloud_cli.py upload -l ./dist/app.exe -r /Releases/app.exe
+```
