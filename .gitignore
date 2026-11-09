@@ -8,3 +8,5 @@
 /release_artifacts/
 /release_manager.py
 /upx.exe
+graphify-out/cache/
+graphify-out/.rebuild.lock

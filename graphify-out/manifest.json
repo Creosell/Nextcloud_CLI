@@ -1,0 +1,26 @@
+{
+  "nextcloud_cli.py": {
+    "mtime": 1764835537.1491978,
+    "seen": 1794208455.7395809,
+    "ast_hash": "ab9cf0fefecc43c52350028aafaa7e91",
+    "semantic_hash": ""
+  },
+  "CHANGELOG.md": {
+    "mtime": 1778137008.9704578,
+    "seen": 1794208455.739586,
+    "ast_hash": "8f9a5f87adbfa9e5495e8238e1d6d159",
+    "semantic_hash": ""
+  },
+  "README.md": {
+    "mtime": 1764837058.785051,
+    "seen": 1794208455.739589,
+    "ast_hash": "d4dc76a03318815699d79543322580a0",
+    "semantic_hash": ""
+  },
+  "requirements.txt": {
+    "mtime": 1763089841.7408066,
+    "seen": 1794208455.73959,
+    "ast_hash": "2eb30ef1e28f8aef84a604a17abd9a41",
+    "semantic_hash": ""
+  }
+}
