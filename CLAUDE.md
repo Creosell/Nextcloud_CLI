@@ -14,7 +14,7 @@ Knowledge graph of the codebase is stored in `graphify-out/` (`graph.json`, `gra
 
 ## Release (Screen Check Suite)
 
-This module is released through the shared tool in the SCT Updater repository (`tools/release/app_release.py`), not with its own `release_manager.py` (kept only for the legacy PyInstaller `zip` releases until the migration is finished).
+This module is released through the shared tool in the SCT Updater repository (`tools/release/app_release.py`) (the former PyInstaller `release_manager.py` is removed).
 
 Files that drive the release in this repository:
 - `sct_app.toml`: module `id`, `launcher` (the exe name users and scripts call; the Rust launcher is built and shipped by the tool), `title` and `icon` (`assets/app.ico`, shown by Windows for the launcher), files to ship (`nextcloud_cli.py` becomes `__main__.py`).

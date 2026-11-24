@@ -1,9 +1,11 @@
 {
   "0": "Environment Setup",
   "1": "nextcloud_cli.py",
-  "2": "Nextcloud",
+  "2": "AsyncNextcloud",
   "3": "[1.2.0]",
-  "4": "list_files_recursive",
-  "5": "main",
-  "6": "get_nc_client"
+  "4": "list_store_blobs",
+  "5": "upload_chunked",
+  "7": "CLAUDE.md",
+  "8": "status_of",
+  "11": "Nextcloud"
 }

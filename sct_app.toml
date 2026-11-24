@@ -1,5 +1,5 @@
 id = "nextcloud_cli"
-launcher = "Nextcloud_CLI.exe"
+launcher = "Nextcloud CLI.exe"
 title = "Nextcloud CLI"
 icon = "assets/app.ico"
 

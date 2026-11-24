@@ -1,26 +1,38 @@
 {
   "nextcloud_cli.py": {
-    "mtime": 1764835537.1491978,
-    "seen": 1794208455.7395809,
-    "ast_hash": "ab9cf0fefecc43c52350028aafaa7e91",
+    "mtime": 1795489293.0164888,
+    "seen": 1795494216.185758,
+    "ast_hash": "88d6a7e0dd0a7fec541a580d7f414ea4",
     "semantic_hash": ""
   },
   "CHANGELOG.md": {
-    "mtime": 1778137008.9704578,
-    "seen": 1794208455.739586,
-    "ast_hash": "8f9a5f87adbfa9e5495e8238e1d6d159",
+    "mtime": 1795489368.3256428,
+    "seen": 1795494216.185767,
+    "ast_hash": "d89e98227c7568f5e8879f135e0198c4",
     "semantic_hash": ""
   },
   "README.md": {
-    "mtime": 1764837058.785051,
-    "seen": 1794208455.739589,
-    "ast_hash": "d4dc76a03318815699d79543322580a0",
+    "mtime": 1795500308.2056434,
+    "seen": 1795508890.5780578,
+    "ast_hash": "a8296099b903cce97328021505bb7fd4",
     "semantic_hash": ""
   },
   "requirements.txt": {
-    "mtime": 1763089841.7408066,
-    "seen": 1794208455.73959,
-    "ast_hash": "2eb30ef1e28f8aef84a604a17abd9a41",
+    "mtime": 1795489362.218952,
+    "seen": 1795494216.185771,
+    "ast_hash": "0be89def3ac76dedadf4fa641ccdf238",
+    "semantic_hash": ""
+  },
+  "CLAUDE.md": {
+    "mtime": 1795502522.1620045,
+    "seen": 1795508890.5780554,
+    "ast_hash": "985d0e69c9744b6f0191f834e7e758e2",
+    "semantic_hash": ""
+  },
+  "release_manager.py": {
+    "mtime": 1795487163.4606187,
+    "seen": 1795494216.185764,
+    "ast_hash": "aa12655db08707bd6d0018bc0882ae89",
     "semantic_hash": ""
   }
 }
