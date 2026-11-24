@@ -1,0 +1,4 @@
+# Runtime dependencies of the Nextcloud CLI module (release tooling is not listed here)
+loguru
+python-dotenv
+nc_py_api

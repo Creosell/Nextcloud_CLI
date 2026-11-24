@@ -8,13 +8,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 - **`download-dir` action**: recursive parallel directory download with preserved folder structure
-- **Parallel downloads**: configurable concurrency via `--jobs` / `-j` flag (default: 5 threads)
+- **Parallel downloads**: configurable concurrency via `--jobs` / `-j` flag (default: 5 parallel tasks)
 - **`list` action**: recursively list all files in a remote directory
-- Connection pool size dynamically matched to thread count to minimize handshake overhead
 
 ### Changed
 - Credentials loaded from `.env` via `python-dotenv` — no hardcoded values
-- HTTP adapter configured with per-action pool size for optimal parallel I/O
+- Migrated from the deprecated sync `Nextcloud` client to `AsyncNextcloud` (asyncio tasks instead of threads; `requests`/`urllib3` are no longer used directly)
 
 ---
 
