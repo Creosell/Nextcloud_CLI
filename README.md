@@ -137,8 +137,9 @@ Uploads a specific file to the server.
 The module is described by `sct_app.toml`, `requirements.in` and `requirements.lock` in this repository. Releases are made from the SCT Updater repository:
 
 ```bash
-uv run tools/release/app_release.py lock <path to this repo>          # only when requirements.in changes
 uv run tools/release/app_release.py app <path to this repo> 1.3.0 --upload
 ```
 
 The tool uploads the code and only the wheels that are missing on the server; the Updater installs them into `apps/nextcloud_cli`. The `release_manager.py` section above describes the legacy PyInstaller `zip` release. Full process and rules: `docs/module-release.md` in the SCT Updater repository.
+
+To test the module the way clients get it, release it to the `dev` list (`app` with `--upload`) and update a test Updater running with `NC_CHANNEL=dev`.

@@ -1,6 +1,7 @@
 id = "nextcloud_cli"
-python = "3.13"
 launcher = "Nextcloud_CLI.exe"
+title = "Nextcloud CLI"
+icon = "assets/app.ico"
 
 [[files]]
 src = "nextcloud_cli.py"
