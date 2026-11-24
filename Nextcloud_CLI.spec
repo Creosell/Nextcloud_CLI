@@ -10,8 +10,8 @@ a = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=['tkinter', 'unittest', 'PyQt5', 'PySide6', 'pydoc_data'],
-    noarchive=False,
+    excludes=['tkinter', 'unittest', 'PyQt5', 'PySide6', 'pydoc_data', 'setuptools', 'pkg_resources', '_distutils_hack', 'distutils', 'sqlite3', '_pyrepl', 'pydoc'],
+    noarchive=True,
     optimize=0,
 )
 pyz = PYZ(a.pure)

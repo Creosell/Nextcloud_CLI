@@ -1,6 +1,4 @@
 loguru
 python-dotenv
 nc_py_api
-requests
-urllib3
-pyinstaller
+pyinstaller==6.22.3

@@ -5,7 +5,7 @@
 #     "nc-py-api",
 #     "requests",
 #     "urllib3",
-#     "pyinstaller",
+#     "pyinstaller==6.22.3",
 #     "python-dotenv",
 # ]
 # ///
@@ -34,6 +34,9 @@ NC_USER = os.environ["NC_USER"]
 NC_PASS = os.environ["NC_PASS"]
 MAX_WORKERS = 20
 UPLOAD_RETRIES = 3
+MODE_RUNTIME_SHARE = "runtime-share"
+STORE_URL = "versions/python_runtime"  # Relative to SCT/Updater; must match the Updater client
+STORE_REMOTE = f"SCT/Updater/{STORE_URL}"
 
 # --- LOGGING ---
 logger.remove()
@@ -110,6 +113,8 @@ def prepare_package(mode, path, include_path, prod_id, ver, temp_dir):
     base_url = f"versions/{prod_id}/{ver}"
     files_map = []
     manifest = {"product_id": prod_id, "version": ver, "base_url": base_url, "package_mode": mode, "files": []}
+    if mode == MODE_RUNTIME_SHARE:
+        manifest["store_url"] = STORE_URL
 
     sources = [(path, False)]
 
@@ -161,7 +166,9 @@ def prepare_package(mode, path, include_path, prod_id, ver, temp_dir):
 
 def main():
     parser = argparse.ArgumentParser(description="Release Manager")
-    parser.add_argument("mode", choices=["zip", "files"])
+    parser.add_argument("mode", choices=["zip", "files", MODE_RUNTIME_SHARE],
+                        help="zip: single archive; files: per-file delta; "
+                             "runtime-share: files stored once by hash in the shared python_runtime store")
     parser.add_argument("path", type=Path, help="Main build directory (contents go to root)")
     parser.add_argument("product_id")
     parser.add_argument("version")
@@ -229,12 +236,80 @@ def main():
         sys.exit(1)
 
 
+def store_path(file_hash: str) -> str:
+    """Returns the remote path of a blob inside the shared store (sharded by the first hash byte)."""
+    return f"{STORE_REMOTE}/{file_hash[:2]}/{file_hash}"
+
+
+async def list_store_blobs(nc: AsyncNextcloud) -> dict[str, int]:
+    """Lists the shared store as {hash: size}, using one PROPFIND per shard directory."""
+    try:
+        shards = [n for n in await nc.files.listdir(STORE_REMOTE) if n.is_dir]
+    except NextcloudException as e:
+        if e.status_code == 404:
+            return {}
+        raise
+
+    sem = asyncio.Semaphore(MAX_WORKERS)
+
+    async def list_shard(shard) -> list:
+        async with sem:
+            return await nc.files.listdir(f"{STORE_REMOTE}/{shard.name}")
+
+    blobs = {}
+    for nodes in await asyncio.gather(*(list_shard(s) for s in shards)):
+        for node in nodes:
+            if not node.is_dir:
+                blobs[node.name] = node.info.content_length
+    return blobs
+
+
+async def upload_runtime_share(nc: AsyncNextcloud, manifest: Path, upload_list: list):
+    """Uploads only the blobs missing from the shared store, then publishes the product manifest last."""
+    data = json.loads(manifest.read_text(encoding="utf-8"))
+    hash_by_path = {f["path"]: f["hash"] for f in data["files"]}
+
+    unique = {}
+    for local, rel in upload_list:
+        unique.setdefault(hash_by_path[rel], local)
+
+    logger.info("Scanning shared store...")
+    existing = await list_store_blobs(nc)
+    missing = {h: p for h, p in unique.items() if existing.get(h) != p.stat().st_size}
+
+    size_mb = sum(p.stat().st_size for p in missing.values()) / 1048576
+    logger.info(f"Store: {len(unique)} unique files | already present: {len(unique) - len(missing)} | "
+                f"to upload: {len(missing)} ({size_mb:.1f} MB)")
+
+    sem = asyncio.Semaphore(MAX_WORKERS)
+
+    async def worker(file_hash: str, local: Path) -> bool:
+        async with sem:
+            return await upload_chunked(nc, local, store_path(file_hash))
+
+    results = await asyncio.gather(*(worker(h, p) for h, p in missing.items()))
+    if not all(results):
+        logger.error(f"Failed to upload {results.count(False)} files. Manifest not published.")
+        sys.exit(1)
+
+    logger.info("Uploading manifest...")
+    if not await upload_chunked(nc, manifest, f"SCT/Updater/versions/{data['product_id']}/{manifest.name}"):
+        sys.exit("Manifest upload failed")
+
+    logger.success("Done!")
+
+
 async def upload_all(args, manifest: Path, upload_list: list):
     """Uploads the manifest and then the package content with bounded concurrency."""
     global _DIR_LOCK
     _DIR_LOCK = asyncio.Lock()
 
     nc = await get_nc_client()
+
+    if args.mode == MODE_RUNTIME_SHARE:
+        await upload_runtime_share(nc, manifest, upload_list)
+        return
+
     remote_root = f"SCT/Updater/versions/{args.product_id}/{args.version}"
 
     # A. Manifest
