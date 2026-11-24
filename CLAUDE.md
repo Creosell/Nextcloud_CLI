@@ -17,7 +17,7 @@ Knowledge graph of the codebase is stored in `graphify-out/` (`graph.json`, `gra
 This module is released through the shared tool in the SCT Updater repository (`tools/release/app_release.py`) (the former PyInstaller `release_manager.py` is removed).
 
 Files that drive the release in this repository:
-- `sct_app.toml`: module `id`, `launcher` (the exe name users and scripts call; the Rust launcher is built and shipped by the tool), `title` and `icon` (`assets/app.ico`, shown by Windows for the launcher), files to ship (`nextcloud_cli.py` becomes `__main__.py`).
+- `sct_app.toml`: module `id`, `launcher` (the exe name users and scripts call; the Rust launcher is built and shipped by the tool), `title` and `icon` (`assets/app.ico`, shown by Windows for the launcher), `obsolete` (old exe names the Updater deletes on install: `Nextcloud_CLI.exe`; add the old name there whenever the launcher is renamed), files to ship (`nextcloud_cli.py` becomes `__main__.py`).
 - `requirements.in`: runtime dependencies only (no PyInstaller, no release tooling).
 - `requirements.lock`: exact versions with hashes. It is updated automatically by `app_release.py app` whenever `requirements.in` changes (commit it); `app_release.py upgrade <this repo>` moves the versions forward.
 

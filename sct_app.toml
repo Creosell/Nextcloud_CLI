@@ -2,6 +2,7 @@ id = "nextcloud_cli"
 launcher = "Nextcloud CLI.exe"
 title = "Nextcloud CLI"
 icon = "assets/app.ico"
+obsolete = ["Nextcloud_CLI.exe"]
 
 [[files]]
 src = "nextcloud_cli.py"
