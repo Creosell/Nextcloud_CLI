@@ -77,7 +77,7 @@ Uploads a specific file to the server.
 The module is described by `sct_app.toml`, `requirements.in` and `requirements.lock` in this repository. Releases are made from the SCT Updater repository:
 
 ```bash
-uv run tools/release/app_release.py app <path to this repo> 1.3.0 --upload
+uv run tools/release/app_release.py app <path to this repo> 1.1.0 --upload
 ```
 
 The tool uploads the code and only the wheels that are missing on the server; the Updater installs them into `apps/nextcloud_cli`. Full process and rules: `docs/module-release.md` in the SCT Updater repository.
