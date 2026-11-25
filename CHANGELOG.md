@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.1.1]
+
+### Fixed
+- The output of the CLI (stdout and stderr) is always UTF-8, so the caller reads paths and messages with non-ASCII characters correctly regardless of the console code page
+
 ## [1.1.0]
 
 Production is on 1.0.0; this entry holds all changes since it.

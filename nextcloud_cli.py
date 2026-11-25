@@ -15,10 +15,13 @@ DIR_CREATE_RETRY_DELAY_SEC = 1.0
 MAX_NETWORK_RETRIES = 2
 NETWORK_RETRY_DELAY_SEC = 2.0
 REQUEST_TIMEOUT_SEC = 60
-APP_VERSION = "1.1.0"
+APP_VERSION = "1.1.1"
 DEFAULT_CONCURRENCY = 5
 
 # --- Logging Setup ---
+# The caller reads the output as UTF-8 whatever the console code page is.
+sys.stdout.reconfigure(encoding="utf-8")
+sys.stderr.reconfigure(encoding="utf-8")
 logger.remove()
 LOG_FOLDER = Path("logs")
 os.makedirs(LOG_FOLDER, exist_ok=True)
