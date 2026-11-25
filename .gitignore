@@ -1,9 +1,7 @@
 /.env
 /test_data/
 /logs/
-/build/
 graphify-out/cache/
 graphify-out/.rebuild.lock
-/Nextcloud CLI.exe
 /.idea/
 /.claude/

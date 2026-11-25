@@ -12,6 +12,15 @@ Knowledge graph of the codebase is stored in `graphify-out/` (`graph.json`, `gra
 - Git hooks rebuild the graph after commit/checkout/merge/rewrite (`graphify hook status`).
 - Freshness: compare `Built from commit` in `GRAPH_REPORT.md` with `git rev-parse HEAD`; run `graphify update .` if stale.
 
+## Development
+
+```bash
+uv sync                                  # environment from uv.lock (Python 3.13)
+uv run nextcloud_cli.py list -r /path    # run; credentials come from .env
+```
+
+The version is stored in two places that change together: `APP_VERSION` in `nextcloud_cli.py` and `version` in `pyproject.toml`. Dependencies are listed in `requirements.in` (release) and `pyproject.toml` (development); keep both lists the same. Logs go to `logs/` of the current directory.
+
 ## Release (Screen Check Suite)
 
 This module is released through the shared tool in the SCT Updater repository (`tools/release/app_release.py`) (the former PyInstaller `release_manager.py` is removed).

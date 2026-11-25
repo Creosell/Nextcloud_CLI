@@ -1,28 +1,12 @@
 # Environment Setup
-## Create local environment
-```bash
-  python -m venv .venv
-````
 
-## Activation of venv
-
-**Windows**
+The module runs on Python 3.13 (`.python-version`); dependencies are in `requirements.in` (locked in `uv.lock` for development and in `requirements.lock` for the release).
 
 ```bash
-  .venv\Scripts\activate
+  uv sync
 ```
 
-**macOS and Linux**
-
-```bash
-  source .venv/bin/activate
-```
-
-## Install dependencies
-
-```bash
-  pip install -r requirements.lock --require-hashes
-```
+Credentials are read from `.env` (`NC_SERVER_URL_QC`, `NC_USER_QC`, `NC_PASSWORD_QC`), which is not committed.
 
 -----
 
@@ -33,8 +17,8 @@ The `nextcloud_cli.py` script provides a command-line interface for interacting 
 **Syntax:**
 
 ```bash
-  uv run --active nextcloud_cli.py [action] [flags]
-````
+  uv run nextcloud_cli.py [action] [flags]
+```
 
 **Actions:**
 
@@ -56,21 +40,21 @@ The `nextcloud_cli.py` script provides a command-line interface for interacting 
 Lists all files in a remote folder and its subfolders to stdout.
 
 ```bash
-  uv run --active nextcloud_cli.py list -r /Project/Builds
+  uv run nextcloud_cli.py list -r /Project/Builds
 ```
 
 **2. Parallel Directory Download**
 Downloads a remote folder recursively using 10 parallel threads to speed up the process.
 
 ```bash
-  uv run --active nextcloud_cli.py download-dir -r /Project/Builds -l ./local_builds -j 10 --force
+  uv run nextcloud_cli.py download-dir -r /Project/Builds -l ./local_builds -j 10 --force
 ```
 
 **3. Single File Upload**
 Uploads a specific file to the server.
 
 ```bash
-  uv run --active nextcloud_cli.py upload -l ./dist/app.exe -r /Releases/app.exe
+  uv run nextcloud_cli.py upload -l ./dist/app.exe -r /Releases/app.exe
 ```
 # Release through the Screen Check Suite tool
 
