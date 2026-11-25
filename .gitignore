@@ -1,12 +1,7 @@
 /.env
 /test_data/
 /logs/
-/Nextcloud_CLI.exe
-/Nextcloud_CLI.spec
 /build/
-/release.log
-/release_artifacts/
-/upx.exe
 graphify-out/cache/
 graphify-out/.rebuild.lock
 /Nextcloud CLI.exe
